@@ -1,0 +1,11 @@
+[package]
+name = "hive"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-postgres = "0.7"
+anyhow = "1.0"
+dotenv = "0.15"
+axum = "0.7"
