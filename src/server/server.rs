@@ -1,7 +1,10 @@
-use crate::db::connect::DbState;
-use axum::{Router, routing::get};
+use axum::{Router};
+use crate::state::app_state::AppState;
+use crate::server::routes::routes;
 
-pub fn create_server(_db_state: DbState) -> Router {
+
+pub fn create_server(state: AppState) -> Router {
     Router::new()
-        .route("/", get(|| async { "Hello from Hive server!" }))
+        .merge(routes())
+        .with_state(state)
 }
