@@ -5,7 +5,9 @@ edition = "2024"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-tokio-postgres = "0.7"
 anyhow = "1.0"
 dotenv = "0.15"
 axum = "0.7"
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "macros"] }
+urlencoding = "2.1"
+

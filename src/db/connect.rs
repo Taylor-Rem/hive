@@ -1,45 +1,38 @@
-use tokio_postgres::{Client, NoTls};
-use std::sync::Arc;
-use anyhow::Result;
+use sqlx::postgres::PgPool;
+use urlencoding::encode;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DbState {
-    pub client: Arc<Client>,
+    pub pool: PgPool,
 }
 
 impl DbState {
-    pub async fn connect() -> Result<Self> {
+    pub async fn connect() -> anyhow::Result<Self> {
         dotenv::dotenv().ok();
-        
-        let db_host = std::env::var("DB_HOST")
-            .expect("DB_HOST must be set in .env file");
-        let db_user = std::env::var("DB_USER")
-            .expect("DB_USER must be set in .env file");
-        let db_pass = std::env::var("DB_PASS")
-            .expect("DB_PASS must be set in .env file");
-        let db_name = std::env::var("DB_NAME")
-            .expect("DB_NAME must be set in .env file");
 
-        // Build the connection string
+        let db_host = std::env::var("DB_HOST")?.trim().to_string();
+        let db_user = std::env::var("DB_USER")?.trim().to_string();
+        let db_pass = std::env::var("DB_PASS")?.trim().to_string();
+        let db_name = std::env::var("DB_NAME")?.trim().to_string();
+        let db_port = std::env::var("DB_PORT")
+            .unwrap_or_else(|_| "5432".to_string())
+            .trim()
+            .to_string();
+
+        // URL-encode the password to handle special characters
+        let encoded_pass = encode(&db_pass);
+
         let database_url = format!(
-            "host={} user={} password={} dbname={}",
-            db_host, db_user, db_pass, db_name
+            "postgres://{}:{}@{}:{}/{}",
+            db_user, encoded_pass, db_host, db_port, db_name
         );
+        
+        println!("Connecting to database at {}...", db_host);
 
-        // Connect to the database
-        let (client, connection) = tokio_postgres::connect(&database_url, NoTls).await?;
-
-        // Spawn the connection in the background
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("Database connection error: {}", e);
-            }
-        });
+        let pool = PgPool::connect(&database_url).await?;
 
         println!("✅ Connected to database at {}", db_host);
 
-        Ok(DbState {
-            client: Arc::new(client),
-        })
+        Ok(DbState { pool })
     }
 }
