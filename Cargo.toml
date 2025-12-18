@@ -10,4 +10,4 @@ dotenv = "0.15"
 axum = "0.7"
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "macros"] }
 urlencoding = "2.1"
-
+paste = "1.0"

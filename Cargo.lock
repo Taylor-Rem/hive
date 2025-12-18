@@ -530,6 +530,7 @@ dependencies = [
  "anyhow",
  "axum",
  "dotenv",
+ "paste",
  "sqlx",
  "tokio",
  "urlencoding",
