@@ -1,6 +1,9 @@
 use crate::db::connect::DbState;
 use sqlx::postgres::PgRow;
 
+use super::where_ops::where_ops;
+use super::join_ops::join_ops;
+
 #[derive(Debug)]
 pub enum Order {
     Asc,
@@ -9,12 +12,13 @@ pub enum Order {
 
 #[derive(Debug)]
 pub struct Query<'a> {
-    db: &'a DbState,
-    select: String,
-    from: String,
-    where_clause: Option<String>,
-    order_by: Option<(String, Order)>,
-    limit: Option<u32>,
+    pub(super) db: &'a DbState,
+    pub(super) select: String,
+    pub(super) from: String,
+    pub(super) joins: Vec<String>,
+    pub(super) wheres: Vec<String>,
+    pub(super) order_by: Option<(String, Order)>,
+    pub(super) limit: Option<u32>,
 }
 
 impl<'a> Query<'a> {
@@ -22,8 +26,9 @@ impl<'a> Query<'a> {
         Self {
             db,
             select: columns.to_string(),
-            from: "".to_string(),
-            where_clause: None,
+            from: String::new(),
+            joins: Vec::new(),
+            wheres: Vec::new(),
             order_by: None,
             limit: None,
         }
@@ -31,11 +36,6 @@ impl<'a> Query<'a> {
 
     pub fn from(mut self, table: &str) -> Self {
         self.from = table.to_string();
-        self
-    }
-
-    pub fn where_eq(mut self, column: &str, value: impl ToString) -> Self {
-        self.where_clause = Some(format!("{} = '{}'", column, value.to_string()));
         self
     }
 
@@ -51,32 +51,51 @@ impl<'a> Query<'a> {
 
     pub fn build(&self) -> String {
         let mut query = format!("SELECT {} FROM {}", self.select, self.from);
-
-        if let Some(where_clause) = &self.where_clause {
-            query.push_str(&format!(" WHERE {}", where_clause));
+    
+        for join in &self.joins {
+            query.push_str(&format!(" {}", join));
         }
-
+    
+        if !self.wheres.is_empty() {
+            query.push_str(&format!(" WHERE {}", self.wheres.join(" AND ")));
+        }
+    
         if let Some((col, ord)) = &self.order_by {
-            let ord_str = match ord {
+            let ord = match ord {
                 Order::Asc => "ASC",
                 Order::Desc => "DESC",
             };
-            query.push_str(&format!(" ORDER BY {} {}", col, ord_str));
+            query.push_str(&format!(" ORDER BY {} {}", col, ord));
         }
-
-        if let Some(limit) = &self.limit {
+    
+        if let Some(limit) = self.limit {
             query.push_str(&format!(" LIMIT {}", limit));
         }
-
+    
         query
     }
+    
 
-    // Build + execute
     pub async fn get(&self) -> anyhow::Result<Vec<PgRow>> {
         let sql = self.build();
         let rows = sqlx::query(&sql)
             .fetch_all(&self.db.pool)
             .await?;
         Ok(rows)
+    }
+
+    // generated methods
+    where_ops! {
+        eq  => "=",
+        ne  => "!=",
+        gt  => ">",
+        gte => ">=",
+        lt  => "<",
+        lte => "<=",
+    }
+
+    join_ops! {
+        join => "JOIN",
+        left_join => "LEFT JOIN"
     }
 }
