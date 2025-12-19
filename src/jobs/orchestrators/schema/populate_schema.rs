@@ -1,27 +1,10 @@
-use crate::db::{DbState, Query, Order};
-use anyhow::Context;
+use anyhow::Result;
+use crate::state::app_state::AppState;
+use crate::jobs::capabilities::db::read_db::read_db_schema;
+use crate::jobs::capabilities::schema::write_schema::write_schema_toml;
 
-pub async fn populate_schema(db: &DbState) -> anyhow::Result<()> {
-    let query = Query::select(db, "*")
-        .from("app_user AS u")
-        .join("cart AS c", "c.app_user_id = u.id")
-        .where_eq("u.id", 1)
-        .order_by("u.created_at", Order::Desc)
-        .limit(1);
-
-    println!("SQL: {}", query.build());
-
-    // Execute query with context for error handling
-    let rows = query
-        .get()
-        .await
-        .with_context(|| format!("Failed to execute query: {}", query.build()))?;
-
-    if rows.is_empty() {
-        println!("No rows returned for query: {}", query.build());
-    } else {
-        println!("Rows returned: {}", rows.len());
-    }
-
+pub async fn populate_schema(state: &AppState) -> Result<()> {
+    let schema = read_db_schema(&state.db).await?;
+    write_schema_toml(schema, "schema/schema.toml")?;
     Ok(())
 }

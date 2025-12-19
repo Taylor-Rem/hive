@@ -1,0 +1,105 @@
+[[table]]
+name = "app_user"
+
+[[table.column]]
+name = "id"
+data_type = "integer"
+nullable = false
+default = "nextval('users_id_seq'::regclass)"
+
+[[table.column]]
+name = "username"
+data_type = "character varying"
+nullable = false
+
+[[table.column]]
+name = "email"
+data_type = "character varying"
+nullable = false
+
+[[table.column]]
+name = "password_hash"
+data_type = "character varying"
+nullable = false
+
+[[table.column]]
+name = "created_at"
+data_type = "timestamp without time zone"
+nullable = true
+default = "now()"
+
+[[table.column]]
+name = "updated_at"
+data_type = "timestamp without time zone"
+nullable = true
+default = "now()"
+
+[[table]]
+name = "cart"
+
+[[table.column]]
+name = "id"
+data_type = "integer"
+nullable = false
+default = "nextval('cart_id_seq'::regclass)"
+
+[[table.column]]
+name = "app_user_id"
+data_type = "integer"
+nullable = false
+
+[[table.column]]
+name = "created_at"
+data_type = "timestamp without time zone"
+nullable = true
+default = "CURRENT_TIMESTAMP"
+
+[[table]]
+name = "cart_product"
+
+[[table.column]]
+name = "cart_id"
+data_type = "integer"
+nullable = false
+
+[[table.column]]
+name = "product_id"
+data_type = "integer"
+nullable = false
+
+[[table.column]]
+name = "quantity"
+data_type = "integer"
+nullable = true
+default = "1"
+
+[[table]]
+name = "product"
+
+[[table.column]]
+name = "id"
+data_type = "integer"
+nullable = false
+default = "nextval('product_id_seq'::regclass)"
+
+[[table.column]]
+name = "name"
+data_type = "text"
+nullable = false
+
+[[table.column]]
+name = "price"
+data_type = "numeric"
+nullable = false
+
+[[table.column]]
+name = "stock"
+data_type = "integer"
+nullable = false
+default = "0"
+
+[[table.column]]
+name = "created_at"
+data_type = "timestamp without time zone"
+nullable = false
+default = "now()"
