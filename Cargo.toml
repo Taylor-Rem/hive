@@ -1,0 +1,12 @@
+[package]
+name = "hive"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+phf = { version = "0.11", features = ["macros"] }
+serde = { version = "1.0", features = ["derive"] }
+reqwest = "0.13.1"
+dotenvy = "0.15"
+inventory = "0.3"
