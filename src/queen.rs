@@ -6,7 +6,7 @@ use crate::traits::{Agent, Worker, WorkerFactory, Tool, ToolFunction};
 use crate::Message;
 
 pub struct Queen {
-    workers: HashMap<&'static str, Box<dyn Worker>>
+    workers: HashMap<&'static str, Box<dyn Worker + Send + Sync>>
 }
 
 impl Agent for Queen {
@@ -81,10 +81,9 @@ impl Queen {
                 let worker_name = arguments["worker"].as_str().unwrap_or("");
                 let instruction = arguments["instruction"].as_str().unwrap_or("");
 
-                if let Some(_worker) = self.workers.get(worker_name) {
-                    // TODO: Worker needs to process the instruction via its own LLM
-                    // For now, return a placeholder
-                    Ok(format!("Worker '{}' received instruction: {}", worker_name, instruction))
+                if let Some(worker) = self.workers.get(worker_name) {
+                    // Call the worker's process method
+                    worker.process(instruction).await
                 } else {
                     Ok(format!("Error: Worker '{}' not found", worker_name))
                 }
