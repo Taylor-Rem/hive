@@ -81,22 +81,37 @@ impl Queen {
                 let worker_name = arguments["worker"].as_str().unwrap_or("");
                 let instruction = arguments["instruction"].as_str().unwrap_or("");
 
+                eprintln!("[QUEEN] Delegating to worker '{}' with instruction: {}", worker_name, instruction);
+
                 if let Some(worker) = self.workers.get(worker_name) {
-                    // Call the worker's process method
-                    worker.process(instruction).await
+                    let result = worker.process(instruction).await;
+                    eprintln!("[QUEEN] Worker '{}' returned: {:?}", worker_name, result);
+                    result
                 } else {
+                    eprintln!("[QUEEN] Error: Worker '{}' not found", worker_name);
                     Ok(format!("Error: Worker '{}' not found", worker_name))
                 }
             }
-            _ => Ok(format!("Error: Unknown tool '{}'", name)),
+            _ => {
+                eprintln!("[QUEEN] Error: Unknown tool '{}'", name);
+                Ok(format!("Error: Unknown tool '{}'", name))
+            }
         }
     }
 
     /// Run the agentic loop until we get a final response
     pub async fn run_agentic_loop(&self, messages: &mut Vec<Message>) -> Result<String> {
         let tools = self.get_tools();
+        let worker_names: Vec<&str> = self.workers.keys().copied().collect();
 
+        eprintln!("[QUEEN] === Starting Queen's Agentic Loop ===");
+        eprintln!("[QUEEN] Available workers: {:?}", worker_names);
+
+        let mut iteration = 0;
         loop {
+            iteration += 1;
+            eprintln!("[QUEEN] --- Iteration {} ---", iteration);
+
             // Make request with tools
             let response = self.make_request(messages, Some(tools.clone())).await?;
 
@@ -105,11 +120,15 @@ impl Queen {
 
             // Check if there are tool calls to process
             if let Some(tool_calls) = &response.tool_calls {
+                eprintln!("[QUEEN] Received {} tool call(s)", tool_calls.len());
+
                 for tool_call in tool_calls {
-                    let result = self.execute_tool_call(
-                        &tool_call.function.name,
-                        &tool_call.function.arguments,
-                    ).await?;
+                    let name = &tool_call.function.name;
+                    let arguments = &tool_call.function.arguments;
+
+                    eprintln!("[QUEEN] Tool call: {}({})", name, arguments);
+
+                    let result = self.execute_tool_call(name, arguments).await?;
 
                     // Add tool result to messages
                     messages.push(Message {
@@ -120,7 +139,10 @@ impl Queen {
                 }
             } else {
                 // No tool calls - we have the final response
-                return Ok(response.content.unwrap_or_default());
+                let final_response = response.content.unwrap_or_default();
+                eprintln!("[QUEEN] === Final Response ===");
+                eprintln!("[QUEEN] {}", final_response);
+                return Ok(final_response);
             }
         }
     }

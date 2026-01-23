@@ -76,6 +76,9 @@ pub trait Agent: Send + Sync {
         let tools = self.get_tools();
         let tools_option = if tools.is_empty() { None } else { Some(tools.clone()) };
 
+        eprintln!("[DEBUG] Agent starting with instruction: {}", instruction);
+        eprintln!("[DEBUG] Available tools: {:?}", tools.iter().map(|t| &t.function.name).collect::<Vec<_>>());
+
         let mut messages = vec![
             Message {
                 role: "system".to_string(),
@@ -89,17 +92,26 @@ pub trait Agent: Send + Sync {
             },
         ];
 
+        let mut iteration = 0;
         loop {
+            iteration += 1;
+            eprintln!("[DEBUG] === Iteration {} ===", iteration);
+
             let response = self.make_request(&messages, tools_option.clone()).await?;
             messages.push(response.clone());
 
             if let Some(tool_calls) = &response.tool_calls {
+                eprintln!("[DEBUG] Received {} tool call(s)", tool_calls.len());
+
                 for tool_call in tool_calls {
+                    let name = &tool_call.function.name;
                     let arguments = &tool_call.function.arguments;
-                    let result = self.execute_tool(
-                        &tool_call.function.name,
-                        &tool_call.function.arguments,
-                    )?;
+
+                    eprintln!("[DEBUG] Tool call: {}({})", name, arguments);
+
+                    let result = self.execute_tool(name, arguments)?;
+
+                    eprintln!("[DEBUG] Tool result: {}", result);
 
                     messages.push(Message {
                         role: "tool".to_string(),
@@ -109,7 +121,9 @@ pub trait Agent: Send + Sync {
                 }
             } else {
                 // No tool calls - return final response
-                return Ok(response.content.unwrap_or_default());
+                let final_response = response.content.unwrap_or_default();
+                eprintln!("[DEBUG] Final response: {}", final_response);
+                return Ok(final_response);
             }
         }
     }
