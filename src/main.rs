@@ -8,17 +8,33 @@ mod workers;
 
 use queen::*;
 use traits::Agent;
-#[derive(Deserialize, Serialize, Clone)]
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Message {
     pub role: String,
-    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct ToolCall {
+    pub function: FunctionCall,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct FunctionCall {
+    pub name: String,
+    pub arguments: serde_json::Value,
 }
 #[tokio::main]
 async fn main() -> Result<()> {
     let queen = Queen::new();
     let mut messages = vec![Message {
         role: "system".to_string(),
-        content: queen.system_prompt().to_string()
+        content: Some(queen.system_prompt().to_string()),
+        tool_calls: None,
     }];
     println!("Queen is ready. Type 'quit' to exit.\n");
 
@@ -37,16 +53,14 @@ async fn main() -> Result<()> {
         // Add user message
         messages.push(Message {
             role: "user".to_string(),
-            content: input,
+            content: Some(input),
+            tool_calls: None,
         });
 
-        // Get response from queen
-        let response = queen.make_request(&messages).await?;
+        // Agentic loop: keep processing until we get a final response
+        let final_response = queen.run_agentic_loop(&mut messages).await?;
 
-        // Add assistant response to history
-        messages.push(response.clone());
-
-        println!("\nQueen: {}\n", response.content);
+        println!("\nQueen: {}\n", final_response);
     }
 
     Ok(())
