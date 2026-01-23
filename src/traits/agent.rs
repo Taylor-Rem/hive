@@ -4,14 +4,31 @@ use serde::{Deserialize, Serialize};
 use crate::Message;
 
 #[derive(Serialize)]
-struct ChatRequest {
-    model: String,
-    messages: Vec<Message>,
-    stream: bool
+pub struct ChatRequest {
+    pub model: String,
+    pub messages: Vec<Message>,
+    pub stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Tool>>,
 }
+
 #[derive(Deserialize)]
-struct ChatResponse {
-    message: Message,
+pub struct ChatResponse {
+    pub message: Message,
+}
+
+#[derive(Serialize, Clone)]
+pub struct Tool {
+    #[serde(rename = "type")]
+    pub tool_type: String,
+    pub function: ToolFunction,
+}
+
+#[derive(Serialize, Clone)]
+pub struct ToolFunction {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
 }
 
 pub trait Agent {
@@ -20,11 +37,12 @@ pub trait Agent {
     fn system_prompt(&self) -> &'static str;
     fn client(&self) -> Client;
 
-    async fn make_request(&self, messages: &Vec<Message>) -> Result<Message> {
+    async fn make_request(&self, messages: &Vec<Message>, tools: Option<Vec<Tool>>) -> Result<Message> {
         let request = ChatRequest {
             model: self.model().to_string(),
             messages: messages.clone(),
             stream: false,
+            tools,
         };
 
         let response = self

@@ -36,7 +36,7 @@ impl Agent for FileManager {
         "http://localhost:11434/api/chat"
     }
     fn model(&self) -> &'static str {
-        "qwen2.5:14b"
+        "qwen2.5:1.5b"
     }
     fn system_prompt(&self) -> &'static str {
         system_prompt()

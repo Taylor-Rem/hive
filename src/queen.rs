@@ -1,10 +1,14 @@
 use std::collections::HashMap;
+use anyhow::Result;
 use reqwest::Client;
-use crate::traits::{Agent, Worker, WorkerFactory};
+use serde_json::json;
+use crate::traits::{Agent, Worker, WorkerFactory, Tool, ToolFunction};
+use crate::Message;
 
 pub struct Queen {
     workers: HashMap<&'static str, Box<dyn Worker>>
 }
+
 impl Agent for Queen {
     fn ollama_url(&self) -> &'static str {
         "http://localhost:11434/api/chat"
@@ -31,6 +35,95 @@ impl Queen {
             .collect();
 
         Queen { workers }
+    }
+
+    /// Build the list of available workers as a formatted string
+    fn get_worker_list(&self) -> String {
+        self.workers
+            .values()
+            .map(|w| format!("- **{}**: {}", w.role(), w.description()))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Build the delegate_to_worker tool with available worker names
+    fn get_tools(&self) -> Vec<Tool> {
+        let worker_names: Vec<&str> = self.workers.keys().copied().collect();
+
+        vec![Tool {
+            tool_type: "function".to_string(),
+            function: ToolFunction {
+                name: "delegate_to_worker".to_string(),
+                description: "Delegate a task to a specialized worker".to_string(),
+                parameters: json!({
+                    "type": "object",
+                    "properties": {
+                        "worker": {
+                            "type": "string",
+                            "enum": worker_names,
+                            "description": "The worker to delegate to"
+                        },
+                        "instruction": {
+                            "type": "string",
+                            "description": "Natural language instruction for the worker"
+                        }
+                    },
+                    "required": ["worker", "instruction"]
+                }),
+            },
+        }]
+    }
+
+    /// Execute a tool call and return the result
+    async fn execute_tool_call(&self, name: &str, arguments: &serde_json::Value) -> Result<String> {
+        match name {
+            "delegate_to_worker" => {
+                let worker_name = arguments["worker"].as_str().unwrap_or("");
+                let instruction = arguments["instruction"].as_str().unwrap_or("");
+
+                if let Some(_worker) = self.workers.get(worker_name) {
+                    // TODO: Worker needs to process the instruction via its own LLM
+                    // For now, return a placeholder
+                    Ok(format!("Worker '{}' received instruction: {}", worker_name, instruction))
+                } else {
+                    Ok(format!("Error: Worker '{}' not found", worker_name))
+                }
+            }
+            _ => Ok(format!("Error: Unknown tool '{}'", name)),
+        }
+    }
+
+    /// Run the agentic loop until we get a final response
+    pub async fn run_agentic_loop(&self, messages: &mut Vec<Message>) -> Result<String> {
+        let tools = self.get_tools();
+
+        loop {
+            // Make request with tools
+            let response = self.make_request(messages, Some(tools.clone())).await?;
+
+            // Add response to message history
+            messages.push(response.clone());
+
+            // Check if there are tool calls to process
+            if let Some(tool_calls) = &response.tool_calls {
+                for tool_call in tool_calls {
+                    let result = self.execute_tool_call(
+                        &tool_call.function.name,
+                        &tool_call.function.arguments,
+                    ).await?;
+
+                    // Add tool result to messages
+                    messages.push(Message {
+                        role: "tool".to_string(),
+                        content: Some(result),
+                        tool_calls: None,
+                    });
+                }
+            } else {
+                // No tool calls - we have the final response
+                return Ok(response.content.unwrap_or_default());
+            }
+        }
     }
 }
 
