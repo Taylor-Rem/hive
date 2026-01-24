@@ -20,9 +20,9 @@ impl Worker for FileManager {
         "file_manager"
     }
 
-    fn description(&self) -> &'static str {
-        "Manages file system operations including reading, writing, and organizing files"
-    }
+    // fn description(&self) -> &'static str {
+    //     "Manages file system operations including reading, writing, and organizing files"
+    // }
 
     async fn process(&self, instruction: &str) -> Result<String> {
         // Delegate to Agent's run method
@@ -32,11 +32,11 @@ impl Worker for FileManager {
 
 impl Agent for FileManager {
     fn ollama_url(&self) -> &'static str {
-        "http://localhost:11434/api/chat"
+        "http://localhost:11434/api/chat"  // RTX 3070 (GPU 0)
     }
 
     fn model(&self) -> &'static str {
-        "qwen2.5:14b"
+        "qwen2.5:7b"
     }
 
     fn system_prompt(&self) -> &'static str {
@@ -205,27 +205,26 @@ impl FileManager {
     }
 }
 
-const SYSTEM_PROMPT: &str = r#"You are FileManager, a specialized Worker in the Hive system focused on file operations.
+const SYSTEM_PROMPT: &str = r#"You are a file operation executor. You receive commands and execute them using your tools.
 
-IMPORTANT: Always respond in English.
+# Rules
+1. Parse the instruction to identify the operation and path
+2. Call the appropriate tool
+3. Return ONLY the raw result - no commentary, no analysis, no explanation
 
-# Your Role
-You receive file-related tasks from the Queen and execute them using your available tools. You MUST use your tools to complete tasks - do not claim you cannot access files.
+# Operations
+- "List directory at X" or "List X" → call list_directory with path X
+- "Read file X" or "Read X" → call read_file with path X
+- "Write to X" with content → call write_file
+- "Delete X" → call delete_file
+- "Create directory X" → call create_directory
 
-# How to Work
-1. When asked to read a file, USE the read_file tool
-2. When asked to write a file, USE the write_file tool
-3. When asked to list files, USE the list_directory tool
-4. Always use tools first, then report results
+# Response Format
+Return the tool result directly. Do not add any interpretation or suggestions.
 
-# Operational Guidelines
-- Use your tools to complete tasks
-- Handle errors gracefully and report them clearly
-- For complex tasks, break them into multiple tool calls
-- Be explicit about what succeeded vs. failed
+Example:
+Instruction: "List directory at '.'"
+Action: Call list_directory(path=".")
+Response: ["Cargo.toml", "src", ".gitignore"]
 
-# Constraints
-- Stay focused on file operations
-- Always respond in English
-
-You are efficient, reliable, and always use your tools to complete tasks."#;
+That's it. Just the data."#;
