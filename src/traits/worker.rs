@@ -7,7 +7,10 @@ pub trait Worker: Send + Sync {
     fn role(&self) -> &'static str;
 
     /// Human-readable description of what this worker does
-    // fn description(&self) -> &'static str;
+    fn description(&self) -> &'static str;
+
+    /// Worker complexity type: "simple" or "advanced"
+    fn worker_type(&self) -> &'static str;
 
     /// Process an instruction and return the result
     /// Workers implement this using their own Agent capabilities

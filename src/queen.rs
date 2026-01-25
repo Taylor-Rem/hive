@@ -10,17 +10,19 @@ pub struct Queen {
 }
 
 impl Agent for Queen {
-    fn ollama_url(&self) -> &'static str {
-        "http://localhost:11435/api/chat"  // P40 (GPU 1)
-    }
-    fn model(&self) -> &'static str {
-        "qwen2.5:32b-instruct-q5_K_M"
-    }
-    fn system_prompt(&self) -> &'static str {
-        system_prompt()
-    }
-    fn client(&self) -> Client {
-        Client::new()
+    fn ollama_url(&self) -> &'static str { "http://localhost:11435/api/chat"  /* P40 (GPU 1) */ }
+    fn model(&self) -> &'static str { "qwen2.5:32b-instruct-q5_K_M" }
+    fn client(&self) -> Client { Client::new() }
+    fn _type(&self) -> &'static str { "advanced" }
+    fn system_prompt(&self) -> &'static str { SYSTEM_PROMPT_TEMPLATE }
+
+    fn custom_placeholders(&self) -> Vec<(&'static str, String)> {
+        let dir = std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| ".".to_string());
+        vec![
+            ("{DIRECTORY}", dir),
+        ]
     }
 }
 
@@ -37,14 +39,26 @@ impl Queen {
         Queen { workers }
     }
 
-    // /// Build the list of available workers as a formatted string
-    // fn get_worker_list(&self) -> String {
-    //     self.workers
-    //         .values()
-    //         .map(|w| format!("- **{}**: {}", w.role(), w.description()))
-    //         .collect::<Vec<_>>()
-    //         .join("\n")
-    // }
+    /// Build the list of available workers as a formatted string
+    fn get_worker_list(&self) -> String {
+        self.workers
+            .values()
+            .map(|w| format!("- **{}** [{}]: {}", w.role(), w.worker_type(), w.description()))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Build the full system prompt with the worker list and placeholders
+    pub fn build_system_prompt(&self) -> String {
+        let mut prompt = SYSTEM_PROMPT_TEMPLATE.replace("{WORKERS}", &self.get_worker_list());
+
+        // Apply custom placeholders
+        for (placeholder, value) in Agent::custom_placeholders(self) {
+            prompt = prompt.replace(placeholder, &value);
+        }
+
+        prompt
+    }
 
     /// Build the delegate_to_worker tool with available worker names
     fn get_tools(&self) -> Vec<Tool> {
@@ -84,9 +98,7 @@ impl Queen {
                 eprintln!("[QUEEN] Delegating to worker '{}' with instruction: {}", worker_name, instruction);
 
                 if let Some(worker) = self.workers.get(worker_name) {
-                    let result = worker.process(instruction).await;
-                    eprintln!("[QUEEN] Worker '{}' returned: {:?}", worker_name, result);
-                    result
+                    worker.process(instruction).await
                 } else {
                     eprintln!("[QUEEN] Error: Worker '{}' not found", worker_name);
                     Ok(format!("Error: Worker '{}' not found", worker_name))
@@ -146,16 +158,29 @@ impl Queen {
     }
 }
 
-fn system_prompt() -> &'static str {
-r#"You are the Queen of Hive. You are the ONLY agent that communicates with the user.
+const SYSTEM_PROMPT_TEMPLATE: &str = r#"You are the Queen of Hive. You are the ONLY agent that communicates with the user.
+
+# Environment
+- Operating System: Linux
+- Current Directory: {DIRECTORY}
+- Workers share this directory. Use RELATIVE paths (e.g., "src/main.rs", "." for current dir) not absolute paths.
 
 # Core Architecture
 - YOU talk to the user. Workers NEVER talk to the user.
 - Workers are TOOLS, not assistants. They execute operations and return raw data.
 - YOU do all thinking, analysis, and synthesis. Workers just fetch and execute.
 
+# Worker Types
+Workers are categorized by complexity:
+
+**simple**: Low-capability workers using small models. Give them atomic, single-operation instructions. They cannot reason, plan, or handle ambiguity. Be explicit and precise.
+- Example: "Read the file at 'src/main.rs'" (not "Look at main.rs and tell me what's important")
+
+**advanced**: High-capability workers using larger models. They can handle complex, multi-step tasks and understand context. Provide full context and let them determine the approach.
+- Example: "Refactor this function to use async/await, ensuring error handling is preserved"
+
 # How to Use Workers
-Workers perform SPECIFIC OPERATIONS and return RAW RESULTS. Never ask a worker to "analyze", "summarize", or "give an overview".
+For **simple** workers: Give specific, atomic operations. They return raw results - YOU do the analysis.
 
 WRONG: "Give me an overview of the project directory"
 RIGHT: "List the directory at '.'" → then YOU analyze the listing
@@ -163,18 +188,18 @@ RIGHT: "List the directory at '.'" → then YOU analyze the listing
 WRONG: "Explain what's in this file"
 RIGHT: "Read the file at 'src/main.rs'" → then YOU explain it
 
-WRONG: "Help me understand the codebase structure"
-RIGHT: "List directory '.'" → "Read file 'Cargo.toml'" → "List directory 'src/'" → then YOU synthesize
+For **advanced** workers: Provide full context and goals. They can handle reasoning and multi-step tasks.
 
 # Available Workers
-- **file_manager**: Executes file operations. Operations: list_directory, read_file, write_file, delete_file, create_directory
+{WORKERS}
 
 # Your Workflow
 1. Receive user request
-2. Break it down into specific data-fetching operations
-3. Request raw data from workers (one operation at a time if needed)
-4. Analyze and synthesize the results yourself
-5. Respond to the user with your analysis
+2. Break it down into operations appropriate for each worker's type
+3. For simple workers: request raw data one operation at a time
+4. For advanced workers: provide full context and let them work
+5. Analyze and synthesize results yourself
+6. Respond to the user with your analysis
 
 # Example
 User: "What does this project do?"
@@ -189,5 +214,8 @@ You should:
 - Be direct and helpful to the user
 - Do your own thinking - don't outsource analysis to workers
 - If you need more data, request it from workers
-- Workers return data; you return answers"#
-}
+- Workers return data; you return answers
+
+# Remember
+- You have full access to read the user's directory and files
+"#;

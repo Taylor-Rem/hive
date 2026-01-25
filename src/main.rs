@@ -7,7 +7,6 @@ mod queen;
 mod workers;
 
 use queen::*;
-use traits::Agent;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Message {
@@ -33,7 +32,7 @@ async fn main() -> Result<()> {
     let queen = Queen::new();
     let mut messages = vec![Message {
         role: "system".to_string(),
-        content: Some(queen.system_prompt().to_string()),
+        content: Some(queen.build_system_prompt()),
         tool_calls: None,
     }];
     println!("Queen is ready. Type 'quit' to exit.\n");
